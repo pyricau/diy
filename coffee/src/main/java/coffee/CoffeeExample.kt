@@ -1,6 +1,7 @@
 package coffee
 
 import diy.Linker
+import diy.bind
 import diy.get
 import diy.install
 import diy.installSingleton
@@ -9,6 +10,7 @@ fun main() {
   manualDI()
   simpleLinker()
   simpleLinkerWithModules()
+  reflectiveLinker()
 }
 
 fun manualDI() {
@@ -64,6 +66,16 @@ fun simpleLinkerWithModules() {
   appModule.factories += logModule.factories + partsModule.factories
 
   val maker = appModule.get<CoffeeMaker>()
+  maker.brew()
+}
+
+fun reflectiveLinker() {
+  println("\nReflective Linker\n")
+  val linker = Linker()
+  linker.bind<Heater, ElectricHeater>()
+  linker.bind<Pump, Thermosiphon>()
+
+  val maker = linker.get<CoffeeMaker>()
   maker.brew()
 }
 

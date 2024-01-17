@@ -1,6 +1,8 @@
 package coffee
 
-class Thermosiphon(
+import diy.Inject
+
+class Thermosiphon @Inject constructor(
   private val logger: CoffeeLogger,
   private val heater: Heater
 ) : Pump {

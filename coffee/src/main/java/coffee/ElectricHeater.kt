@@ -1,6 +1,10 @@
 package coffee
 
-class ElectricHeater(private val logger: CoffeeLogger) : Heater {
+import diy.Inject
+import diy.Singleton
+
+@Singleton
+class ElectricHeater @Inject constructor(private val logger: CoffeeLogger) : Heater {
   override var isHot = false
     private set
 

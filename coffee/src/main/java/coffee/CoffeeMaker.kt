@@ -1,6 +1,8 @@
 package coffee
 
-class CoffeeMaker(
+import diy.Inject
+
+class CoffeeMaker @Inject constructor(
   private val logger: CoffeeLogger,
   private val heater: Heater,
   private val pump: Pump

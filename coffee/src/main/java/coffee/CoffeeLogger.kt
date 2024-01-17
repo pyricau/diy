@@ -1,6 +1,10 @@
 package coffee
 
-class CoffeeLogger {
+import diy.Inject
+import diy.Singleton
+
+@Singleton
+class CoffeeLogger @Inject constructor() {
 
   private val _logs = mutableListOf<String>()
 
