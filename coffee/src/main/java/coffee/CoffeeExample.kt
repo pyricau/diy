@@ -1,56 +1,70 @@
 package coffee
 
-import diy.Linker
+import diy.FactoryHolderModule
+import diy.ObjectGraph
+import diy.InjectProcessorModule
+import diy.ReflectiveModule
 import diy.bind
 import diy.get
 import diy.install
 import diy.installSingleton
 
 fun main() {
-  manualDI()
-  simpleLinker()
-  simpleLinkerWithModules()
-  reflectiveLinker()
+  println("\nManual DI\n")
+  val coffeeMaker1 = createWithManualDI()
+  coffeeMaker1.brew()
+
+  println("\nFactory Holder\n")
+  val coffeeMaker2 = createWithFactoryHolderModule()
+  coffeeMaker2.brew()
+
+  println("\nFactory Holder Modules\n")
+  val coffeeMaker3 = createWithFactoryHolderModules()
+  coffeeMaker3.brew()
+
+  println("\nReflective Module\n")
+  val coffeeMaker4 = createWithReflectiveModule()
+  coffeeMaker4.brew()
+
+  println("\nInject Processor Module\n")
+  val coffeeMaker5 = createWithInjectProcessorModule()
+  coffeeMaker5.brew()
 }
 
-fun manualDI() {
-  println("\nManual DI\n")
+fun createWithManualDI(): CoffeeMaker {
   val logger = CoffeeLogger()
   val heater = ElectricHeater(logger)
   val pump = Thermosiphon(logger, heater)
-  val coffeeMaker = CoffeeMaker(logger, heater, pump)
-
-  coffeeMaker.brew()
+  return CoffeeMaker(logger, heater, pump)
 }
 
-fun simpleLinker() {
-  println("\nSimple Linker\n")
-  val linker = Linker()
-  linker.installSingleton {
+fun createWithFactoryHolderModule(): CoffeeMaker {
+  val module = FactoryHolderModule()
+  module.installSingleton {
     CoffeeLogger()
   }
-  linker.installSingleton<Heater> {
+  module.installSingleton<Heater> {
     ElectricHeater(get())
   }
-  linker.install<Pump> {
+  module.install<Pump> {
     Thermosiphon(get(), get())
   }
-  linker.install {
+  module.install {
     CoffeeMaker(get(), get(), get())
   }
 
-  val maker = linker.get<CoffeeMaker>()
-  maker.brew()
+  val objectGraph = ObjectGraph(module)
+
+  return objectGraph.get()
 }
 
-fun simpleLinkerWithModules() {
-  println("\nSimple Linker with modules\n")
-  val logModule = Linker()
+fun createWithFactoryHolderModules(): CoffeeMaker {
+  val logModule = FactoryHolderModule()
   logModule.installSingleton {
     CoffeeLogger()
   }
 
-  val partsModule = Linker()
+  val partsModule = FactoryHolderModule()
   partsModule.installSingleton<Heater> {
     ElectricHeater(get())
   }
@@ -58,24 +72,32 @@ fun simpleLinkerWithModules() {
     Thermosiphon(get(), get())
   }
 
-  val appModule = Linker()
+  val appModule = FactoryHolderModule()
   appModule.install {
     CoffeeMaker(get(), get(), get())
   }
 
-  appModule.factories += logModule.factories + partsModule.factories
+  val objectGraph = ObjectGraph(logModule, partsModule, appModule)
 
-  val maker = appModule.get<CoffeeMaker>()
-  maker.brew()
+  return objectGraph.get()
 }
 
-fun reflectiveLinker() {
-  println("\nReflective Linker\n")
-  val linker = Linker()
-  linker.bind<Heater, ElectricHeater>()
-  linker.bind<Pump, Thermosiphon>()
+fun createWithReflectiveModule(): CoffeeMaker {
+  val module = FactoryHolderModule()
+  module.bind<Heater, ElectricHeater>()
+  module.bind<Pump, Thermosiphon>()
 
-  val maker = linker.get<CoffeeMaker>()
-  maker.brew()
+  val objectGraph = ObjectGraph(module, ReflectiveModule())
+
+  return objectGraph.get()
 }
 
+fun createWithInjectProcessorModule(): CoffeeMaker {
+  val module = FactoryHolderModule()
+  module.bind<Heater, ElectricHeater>()
+  module.bind<Pump, Thermosiphon>()
+
+  val objectGraph = ObjectGraph(module, InjectProcessorModule())
+
+  return objectGraph.get()
+}

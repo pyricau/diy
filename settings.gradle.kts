@@ -15,3 +15,4 @@ rootProject.name = "playground"
 
 include(":coffee")
 include(":diy-lib")
+include(":diy-processor")
