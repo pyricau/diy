@@ -22,8 +22,10 @@ class ReflectiveModule : Module {
     } as Constructor<T>
 
     override fun get(objectGraph: ObjectGraph): T {
-      val parameters = injectConstructor.parameterTypes.map { paramType -> objectGraph[paramType] }
-      return injectConstructor.newInstance(*parameters.toTypedArray())
+      val parameters = injectConstructor.parameterTypes.map { paramType ->
+        objectGraph[paramType]
+      }.toTypedArray()
+      return injectConstructor.newInstance(*parameters)
     }
   }
 }

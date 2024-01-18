@@ -5,6 +5,7 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.ClassKind.INTERFACE
 import com.google.devtools.ksp.validate
 import diy.Binds
 import diy.Component
@@ -51,7 +52,7 @@ class ComponentProcessor(
     val unprocessedSymbols = annotatedSymbols.filter { !it.validate() }.toList()
     annotatedSymbols
       .filterIsInstance<KSClassDeclaration>()
-      .filter { it.validate() }
+      .filter { it.validate() && it.classKind == INTERFACE }
       .forEach { it.accept(ComponentVisitor(), Unit) }
     return unprocessedSymbols
   }
@@ -160,7 +161,6 @@ class ComponentProcessor(
       with(model) {
         ktFile.appendLine("package $packageName")
         ktFile.appendLine()
-
 
         imports.forEach { import ->
           ktFile.appendLine("import $import")

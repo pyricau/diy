@@ -89,21 +89,25 @@ fun createWithFactoryHolderModules(): CoffeeMaker {
 }
 
 fun createWithReflectiveModule(): CoffeeMaker {
-  val module = FactoryHolderModule()
-  module.bind<Heater, ElectricHeater>()
-  module.bind<Pump, Thermosiphon>()
-
-  val objectGraph = ObjectGraph(module, ReflectiveModule())
+  val objectGraph = ObjectGraph(
+    FactoryHolderModule().apply {
+      bind<Heater, ElectricHeater>()
+      bind<Pump, Thermosiphon>()
+    },
+    ReflectiveModule()
+  )
 
   return objectGraph.get()
 }
 
 fun createWithInjectProcessorModule(): CoffeeMaker {
-  val module = FactoryHolderModule()
-  module.bind<Heater, ElectricHeater>()
-  module.bind<Pump, Thermosiphon>()
-
-  val objectGraph = ObjectGraph(module, InjectProcessorModule())
+  val objectGraph = ObjectGraph(
+    FactoryHolderModule().apply {
+      bind<Heater, ElectricHeater>()
+      bind<Pump, Thermosiphon>()
+    },
+    InjectProcessorModule()
+  )
 
   return objectGraph.get()
 }
