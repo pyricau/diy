@@ -29,6 +29,10 @@ fun main() {
   println("\nInject Processor Module\n")
   val coffeeMaker5 = createWithInjectProcessorModule()
   coffeeMaker5.brew()
+
+  println("\nComponent Processor\n")
+  val coffeeMaker6 = createWithComponentProcessor()
+  coffeeMaker6.brew()
 }
 
 fun createWithManualDI(): CoffeeMaker {
@@ -100,4 +104,9 @@ fun createWithInjectProcessorModule(): CoffeeMaker {
   val objectGraph = ObjectGraph(module, InjectProcessorModule())
 
   return objectGraph.get()
+}
+
+fun createWithComponentProcessor(): CoffeeMaker {
+  val component = GeneratedCoffeeComponent()
+  return component.coffeeMaker
 }

@@ -22,12 +22,12 @@ class InjectProcessor(
     val unprocessedSymbols = annotatedSymbols.filter { !it.validate() }.toList()
     annotatedSymbols
       .filter { it is KSFunctionDeclaration && it.validate() }
-      .forEach { it.accept(InjectVisitor(), Unit) }
+      .forEach { it.accept(InjectConstructorVisitor(), Unit) }
     return unprocessedSymbols
   }
 
   @OptIn(KspExperimental::class)
-  inner class InjectVisitor : KSVisitorVoid() {
+  inner class InjectConstructorVisitor : KSVisitorVoid() {
     override fun visitFunctionDeclaration(
       function: KSFunctionDeclaration,
       data: Unit
@@ -36,43 +36,45 @@ class InjectProcessor(
       val injectedClassSimpleName = injectedClass.simpleName.asString()
       val packageName = injectedClass.containingFile!!.packageName.asString()
       val className = "${injectedClassSimpleName}_Factory"
-      val file = codeGenerator.createNewFile(
+      codeGenerator.createNewFile(
         Dependencies(true, function.containingFile!!), packageName, className
-      )
-      file.appendLine("package $packageName")
-      file.appendLine()
-      file.appendLine("import diy.Factory")
-      file.appendLine("import diy.ObjectGraph")
+      ).use { ktFile ->
+        ktFile.appendLine("package $packageName")
+        ktFile.appendLine()
+        ktFile.appendLine("import diy.Factory")
+        ktFile.appendLine("import diy.ObjectGraph")
 
-      if (injectedClass.isAnnotationPresent(Singleton::class)) {
-        file.appendLine("import diy.singleton")
+        if (injectedClass.isAnnotationPresent(Singleton::class)) {
+          ktFile.appendLine("import diy.singleton")
+        }
+
+        if (function.parameters.isNotEmpty()) {
+          ktFile.appendLine("import diy.get")
+        }
+        ktFile.appendLine()
+        ktFile.appendLine("class $className : Factory<$injectedClassSimpleName> {")
+
+        val constructorInvocation =
+          "${injectedClassSimpleName}(" + function.parameters.joinToString(", ") {
+            "objectGraph.get()"
+          } + ")"
+
+        if (injectedClass.isAnnotationPresent(Singleton::class)) {
+          val linkerParameter = if (function.parameters.isNotEmpty()) "objectGraph ->" else ""
+          ktFile.appendLine("    private val singletonFactory = singleton { $linkerParameter")
+          ktFile.appendLine("        $constructorInvocation")
+          ktFile.appendLine("    }")
+          ktFile.appendLine()
+          ktFile.appendLine(
+            "    override fun get(objectGraph: ObjectGraph) = singletonFactory.get(objectGraph)"
+          )
+        } else {
+          ktFile.appendLine(
+            "    override fun get(objectGraph: ObjectGraph) = $constructorInvocation"
+          )
+        }
+        ktFile.appendLine("}")
       }
-
-      if (function.parameters.isNotEmpty()) {
-        file.appendLine("import diy.get")
-      }
-      file.appendLine()
-      file.appendLine("class $className : Factory<$injectedClassSimpleName> {")
-
-      val constructorInvocation =
-        "${injectedClassSimpleName}(" + function.parameters.joinToString(", ") {
-          "objectGraph.get()"
-        } + ")"
-
-      if (injectedClass.isAnnotationPresent(Singleton::class)) {
-        val linkerParameter = if (function.parameters.isNotEmpty()) "objectGraph ->" else ""
-        file.appendLine("    private val singletonFactory = singleton { $linkerParameter")
-        file.appendLine("        $constructorInvocation")
-        file.appendLine("    }")
-        file.appendLine()
-        file.appendLine(
-          "    override fun get(objectGraph: ObjectGraph) = singletonFactory.get(objectGraph)"
-        )
-      } else {
-        file.appendLine("    override fun get(objectGraph: ObjectGraph) = $constructorInvocation")
-      }
-      file.appendLine("}")
-      file.close()
     }
   }
 }
