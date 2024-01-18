@@ -10,6 +10,7 @@ import diy.Binds
 import diy.Component
 import diy.Inject
 import diy.Singleton
+import java.io.OutputStream
 import kotlin.reflect.KClass
 
 class ComponentProcessorProvider : SymbolProcessorProvider {
@@ -19,6 +20,27 @@ class ComponentProcessorProvider : SymbolProcessorProvider {
     return ComponentProcessor(environment.codeGenerator)
   }
 }
+
+data class ComponentFactory(
+  val type: KSClassDeclaration,
+  val constructorParameters: List<KSDeclaration>,
+  val isSingleton: Boolean
+)
+
+data class EntryPoint(
+  val propertyDeclaration: KSPropertyDeclaration,
+  val propertyType: KSDeclaration
+)
+
+class ComponentModel(
+  val packageName: String,
+  val imports: Set<String>,
+  val className: String,
+  val componentInterfaceName: String,
+  val factories: List<ComponentFactory>,
+  val binds: Map<KSDeclaration, KSDeclaration>,
+  val entryPoints: List<EntryPoint>
+)
 
 class ComponentProcessor(
   val codeGenerator: CodeGenerator
@@ -44,82 +66,101 @@ class ComponentProcessor(
       val packageName = classDeclaration.containingFile!!.packageName.asString()
       val className = "Generated${componentInterfaceName}"
 
+      val componentAnnotation = classDeclaration.annotations.single {
+        it isInstance Component::class
+      }
+
+      val entryPoints = readEntryPoints(classDeclaration)
+
+      val entryPointTypes = entryPoints.map { it.propertyType }
+
+      val binds = readBinds(componentAnnotation)
+
+      val bindProvidedTypes = binds.values
+      val factories = traverseDependencyGraph(entryPointTypes + bindProvidedTypes)
+
+      val importDeclarations = entryPointTypes + bindProvidedTypes + factories.map { it.type }
+      val actualImports = importDeclarations
+        .filter { it.packageName != classDeclaration.packageName }
+        .map { it.qualifiedName!!.asString() }.toSet() +
+        if (factories.any { it.isSingleton }) {
+          setOf("diy.componentSingleton")
+        } else emptySet()
+
+      val model = ComponentModel(
+        packageName = packageName,
+        imports = actualImports,
+        className = className,
+        componentInterfaceName = componentInterfaceName,
+        factories = factories,
+        binds = binds,
+        entryPoints = entryPoints,
+      )
+
       codeGenerator.createNewFile(
         Dependencies(true, classDeclaration.containingFile!!), packageName, className
       ).use { ktFile ->
+        generateComponent(model, ktFile)
+      }
+    }
 
+    private fun readEntryPoints(classDeclaration: KSClassDeclaration) =
+      classDeclaration.getDeclaredProperties().map { property ->
+        val resolvedPropertyType = property.type.resolve().declaration
+        EntryPoint(property, resolvedPropertyType)
+      }.toList()
+
+    private fun readBinds(componentAnnotation: KSAnnotation): Map<KSDeclaration, KSDeclaration> {
+      val bindModules = componentAnnotation.getArgument("modules").value as List<KSType>
+      val binds = bindModules
+        .map { it.declaration as KSClassDeclaration }
+        .flatMap { it.getDeclaredFunctions() }
+        .filter { it.isAnnotationPresent(Binds::class) }
+        .associate { function ->
+          val resolvedReturnType = function.returnType!!.resolve().declaration
+          val resolvedParamType = function.parameters.single().type.resolve().declaration
+          resolvedReturnType to resolvedParamType
+        }
+      return binds
+    }
+
+    private fun traverseDependencyGraph(factoryEntryPoints: List<KSDeclaration>): List<ComponentFactory> {
+      val typesToProcess = mutableListOf<KSDeclaration>()
+      typesToProcess += factoryEntryPoints
+
+      val factories = mutableListOf<ComponentFactory>()
+      val typesVisited = mutableListOf<KSDeclaration>()
+      while (typesToProcess.isNotEmpty()) {
+        val visitedClassDeclaration = typesToProcess.removeFirst() as KSClassDeclaration
+        if (visitedClassDeclaration !in typesVisited) {
+          typesVisited += visitedClassDeclaration
+          val injectConstructors = visitedClassDeclaration.getConstructors()
+            .filter { it.isAnnotationPresent(Inject::class) }
+            .toList()
+          check(injectConstructors.size < 2) {
+            "There should be a most one @Inject constructor"
+          }
+          if (injectConstructors.isNotEmpty()) {
+            val injectConstructor = injectConstructors.first()
+            val constructorParams =
+              injectConstructor.parameters.map { it.type.resolve().declaration }
+            typesToProcess += constructorParams
+            val isSingleton = visitedClassDeclaration.isAnnotationPresent(Singleton::class)
+            factories += ComponentFactory(visitedClassDeclaration, constructorParams, isSingleton)
+          }
+        }
+      }
+      return factories
+    }
+
+    private fun generateComponent(
+      model: ComponentModel,
+      ktFile: OutputStream
+    ) {
+      with(model) {
         ktFile.appendLine("package $packageName")
         ktFile.appendLine()
 
-        val componentAnnotation = classDeclaration.annotations.single {
-          it isInstance Component::class
-        }
-
-        val modulesArgument = componentAnnotation.getArgument("modules")
-
-        val modules = modulesArgument.value as List<KSType>
-
-        val importDeclarations = mutableSetOf<KSDeclaration>()
-        val imports = mutableSetOf<String>()
-
-        val entryPoints = classDeclaration.getDeclaredProperties().map { property ->
-          val resolvedPropertyType = property.type.resolve().declaration
-          importDeclarations += resolvedPropertyType
-
-          property.simpleName.asString() to resolvedPropertyType
-        }
-
-        val typesToProcess = entryPoints.map { it.second }.toMutableList()
-
-        val binds = modules
-          .map { it.declaration as KSClassDeclaration }
-          .flatMap { it.getDeclaredFunctions() }
-          .filter { it.isAnnotationPresent(Binds::class) }
-          .associate { function ->
-            val resolvedReturnType = function.returnType!!.resolve().declaration
-            val resolvedParamType = function.parameters.single().type.resolve().declaration
-            importDeclarations += resolvedParamType
-            typesToProcess += resolvedParamType
-            resolvedReturnType to resolvedParamType
-          }
-
-        data class ComponentFactory(
-          val type: KSClassDeclaration,
-          val constructorParameters: List<KSDeclaration>,
-          val isSingleton: Boolean
-        )
-
-        val factories = mutableListOf<ComponentFactory>()
-        val typesVisited = mutableListOf<KSDeclaration>()
-
-        while (typesToProcess.isNotEmpty()) {
-          val classDeclaration = typesToProcess.removeFirst() as KSClassDeclaration
-          if (classDeclaration !in typesVisited) {
-            typesVisited += classDeclaration
-            val injectConstructors = classDeclaration.getConstructors()
-              .filter { it.isAnnotationPresent(Inject::class) }
-              .toList()
-            check(injectConstructors.size < 2) {
-              "There should be a most one @Inject constructor"
-            }
-            if (injectConstructors.isNotEmpty()) {
-              val injectConstructor = injectConstructors.first()
-              importDeclarations += classDeclaration
-              val constructorParams =
-                injectConstructor.parameters.map { it.type.resolve().declaration }
-              typesToProcess += constructorParams
-              val isSingleton = classDeclaration.isAnnotationPresent(Singleton::class)
-              if (isSingleton) {
-                imports += "diy.componentSingleton"
-              }
-              factories += ComponentFactory(classDeclaration, constructorParams, isSingleton)
-            }
-          }
-        }
-
-        imports += importDeclarations
-          .filter { it.packageName != classDeclaration.packageName }
-          .map { it.qualifiedName!!.asString() }
 
         imports.forEach { import ->
           ktFile.appendLine("import $import")
@@ -141,12 +182,12 @@ class ComponentProcessor(
           ktFile.appendLine("    }")
         }
 
-        entryPoints.forEach { (name, type) ->
+        entryPoints.forEach { (propertyDeclaration, type) ->
+          val name = propertyDeclaration.simpleName.asString()
           val typeSimpleName = type.simpleName.asString()
           ktFile.appendLine("    override val $name: $typeSimpleName")
           ktFile.appendLine("      get() = provide$typeSimpleName()")
         }
-
         ktFile.appendLine("}")
       }
     }
