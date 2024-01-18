@@ -8,9 +8,9 @@ import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.validate
 import diy.Binds
 import diy.Component
-import diy.Inject
-import diy.Singleton
 import java.io.OutputStream
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.reflect.KClass
 
 class ComponentProcessorProvider : SymbolProcessorProvider {

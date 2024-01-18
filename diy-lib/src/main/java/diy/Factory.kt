@@ -4,8 +4,6 @@ fun interface Factory<T> {
   fun get(objectGraph: ObjectGraph): T
 }
 
-val UNINITIALIZED = Any()
-
 fun <T> singleton(factory: Factory<T>): Factory<T> {
   var instance: Any? = UNINITIALIZED
   return Factory { linker ->
@@ -15,3 +13,5 @@ fun <T> singleton(factory: Factory<T>): Factory<T> {
     instance as T
   }
 }
+
+val UNINITIALIZED = Any()

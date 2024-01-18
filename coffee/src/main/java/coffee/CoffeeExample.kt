@@ -1,8 +1,8 @@
 package coffee
 
 import diy.FactoryHolderModule
-import diy.ObjectGraph
 import diy.InjectProcessorModule
+import diy.ObjectGraph
 import diy.ReflectiveModule
 import diy.bind
 import diy.get
@@ -44,13 +44,15 @@ fun createWithManualDI(): CoffeeMaker {
 
 fun createWithFactoryHolderModule(): CoffeeMaker {
   val module = FactoryHolderModule()
+  module.bind<Heater, ElectricHeater>()
+  module.bind<Pump, Thermosiphon>()
   module.installSingleton {
     CoffeeLogger()
   }
-  module.installSingleton<Heater> {
+  module.installSingleton {
     ElectricHeater(get())
   }
-  module.install<Pump> {
+  module.install {
     Thermosiphon(get(), get())
   }
   module.install {

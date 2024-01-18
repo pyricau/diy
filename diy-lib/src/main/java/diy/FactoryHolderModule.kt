@@ -14,14 +14,18 @@ class FactoryHolderModule : Module {
   }
 }
 
-inline fun <reified T> FactoryHolderModule.install(noinline factory: ObjectGraph.() -> T) =
-  install(T::class.java, factory)
+inline fun <reified T> FactoryHolderModule.install(
+  noinline factory: ObjectGraph.() -> T
+) = install(T::class.java, factory)
 
-inline fun <reified T> FactoryHolderModule.installSingleton(noinline factory: ObjectGraph.() -> T) {
+inline fun <reified T> FactoryHolderModule.installSingleton(
+  noinline factory: ObjectGraph.() -> T
+) {
   install(T::class.java, singleton(factory))
 }
 
-inline fun <reified REQUESTED, reified PROVIDED : REQUESTED> FactoryHolderModule.bind() {
+inline fun <reified REQUESTED, reified PROVIDED : REQUESTED>
+  FactoryHolderModule.bind() {
   install(REQUESTED::class.java) { objectGraph ->
     objectGraph[PROVIDED::class.java]
   }

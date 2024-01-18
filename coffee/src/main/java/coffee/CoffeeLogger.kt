@@ -1,7 +1,7 @@
 package coffee
 
-import diy.Inject
-import diy.Singleton
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @Singleton
 class CoffeeLogger @Inject constructor() {

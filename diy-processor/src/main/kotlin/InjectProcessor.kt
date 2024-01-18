@@ -3,8 +3,8 @@ import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.validate
-import diy.Inject
-import diy.Singleton
+import javax.inject.Inject
+import javax.inject.Singleton
 
 class InjectProcessorProvider : SymbolProcessorProvider {
   override fun create(

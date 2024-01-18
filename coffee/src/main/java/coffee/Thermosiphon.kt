@@ -1,6 +1,6 @@
 package coffee
 
-import diy.Inject
+import javax.inject.Inject
 
 class Thermosiphon @Inject constructor(
   private val logger: CoffeeLogger,

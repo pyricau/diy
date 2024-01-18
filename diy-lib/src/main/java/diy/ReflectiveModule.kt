@@ -1,6 +1,8 @@
 package diy
 
 import java.lang.reflect.Constructor
+import javax.inject.Inject
+import javax.inject.Singleton
 
 class ReflectiveModule : Module {
   override fun <T> get(requestedType: Class<T>): Factory<T> {

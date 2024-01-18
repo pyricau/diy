@@ -1,6 +1,6 @@
 package coffee
 
-import diy.Inject
+import javax.inject.Inject
 
 class CoffeeMaker @Inject constructor(
   private val logger: CoffeeLogger,
