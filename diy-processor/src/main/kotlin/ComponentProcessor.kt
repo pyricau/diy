@@ -112,6 +112,7 @@ class ComponentProcessor(
       }.toList()
 
     private fun readBinds(componentAnnotation: KSAnnotation): Map<KSDeclaration, KSDeclaration> {
+      @Suppress("UNCHECKED_CAST")
       val bindModules = componentAnnotation.getArgument("modules").value as List<KSType>
       val binds = bindModules
         .map { it.declaration as KSClassDeclaration }
@@ -200,5 +201,5 @@ infix fun KSAnnotation.isInstance(annotationKClass: KClass<*>): Boolean {
 }
 
 fun KSAnnotation.getArgument(name: String): KSValueArgument {
-  return arguments.single { it.name?.asString() == "modules" }
+  return arguments.single { it.name?.asString() == name }
 }
